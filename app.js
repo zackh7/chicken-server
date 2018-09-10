@@ -13,6 +13,9 @@ var oauth = require('./oauth');
 var login = require('./routes/login');
 var routes = require('./routes/index');
 
+var userm = require('./routes/userm');
+var employee = require('./routes/employee');
+var role = require('./routes/role');
 var category = require('./routes/category');
 var product = require('./routes/product');
 var subcategory = require('./routes/subcategory');
@@ -83,6 +86,9 @@ app.use('/backup', backup);
 app.use('/order',order);
 app.use('/kitchen',kitchen);
 app.use('/takeaway',takeaway);
+app.use('/userm',userm);
+app.use('/employee',employee);
+app.use('/role',role);
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
   var err = new Error('Not Found');

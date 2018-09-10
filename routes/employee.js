@@ -4,10 +4,13 @@ var oauth = require('../oauth/index');
 var pg = require('pg');
 var path = require('path');
 var config = require('../config.js');
+var multer = require('multer');
+var filenamestore = "";
 
 var pool = new pg.Pool(config);
 
-router.get('/', oauth.authorise(), (req, res, next) => {
+router.post('/forgot', (req, res, next) => {
+  console.log(req.body);
   const results = [];
   pool.connect(function(err, client, done){
     if(err) {
@@ -16,7 +19,7 @@ router.get('/', oauth.authorise(), (req, res, next) => {
       console.log("the error is"+err);
       return res.status(500).json({success: false, data: err});
     }
-    const query = client.query("SELECT *,EMP_NAME||' - ( '||EMP_MOBILE||' )' AS EMP_SEARCH FROM EMPLOYEE_MASTER where emp_status = 0 order by emp_id desc");
+    const query = client.query("SELECT emp_email_id FROM employee_master where emp_email_id=$1",[req.body.email]);
     query.on('row', (row) => {
       results.push(row);
     });
@@ -25,13 +28,13 @@ router.get('/', oauth.authorise(), (req, res, next) => {
       // pg.end();
       return res.json(results);
     });
-    done(err);
+  done(err);
   });
 });
 
-router.get('/:empId', oauth.authorise(), (req, res, next) => {
+router.get('/:employeeId', oauth.authorise(), (req, res, next) => {
   const results = [];
-  const id = req.params.empId;
+  const id = req.params.employeeId;
   pool.connect(function(err, client, done){
     if(err) {
       done();
@@ -40,7 +43,7 @@ router.get('/:empId', oauth.authorise(), (req, res, next) => {
       return res.status(500).json({success: false, data: err});
     }
     // SQL Query > Select Data
-    const query = client.query('SELECT * FROM employee_master where emp_id=$1',[id]);
+    const query = client.query('SELECT emp_name,emp_mobile,emp_address,emp_correspondence_address,emp_aadhar_no,emp_pancard_no,emp_designation,emp_emp_no,emp_email_id,emp_qualification,emp_image,emp_created_at,emp_updated_at,emp_status FROM employee_master where emp_id=$1',[id]);
     query.on('row', (row) => {
       results.push(row);
     });
@@ -49,37 +52,33 @@ router.get('/:empId', oauth.authorise(), (req, res, next) => {
       // pg.end();
       return res.json(results);
     });
-    done(err);
+  done(err);
   });
 });
-
-/*router.post('/add', oauth.authorise(), (req, res, next) => {
-  const results = [];
-  pool.connect(function(err, client, done){
-    if(err) {
-      done();
-      // pg.end();
-      console.log("the error is"+err);
-      return res.status(500).json({success: false, data: err});
-    }
-    // SQL Query > Insert Data
-    client.query('INSERT INTO employee_master(emp_name, emp_mobile, emp_address, emp_status) values($1,$2,$3,0)',[req.body.emp_name,req.body.emp_mobile,req.body.emp_address]);
-    // SQL Query > Select Data
-    const query = client.query('SELECT * FROM employee_master');
-    query.on('row', (row) => {
-      results.push(row);
-    });
-    query.on('end', () => {
-      done();
-      // pg.end();
-      return res.json(results);
-    });
-    done(err);
-  });
-});*/
 
 router.post('/add', oauth.authorise(), (req, res, next) => {
   const results = [];
+  var Storage = multer.diskStorage({
+      destination: function (req, file, callback) {
+          // callback(null, "./images");
+            callback(null, '../logichron/resources/images-new');
+            
+      },
+      filename: function (req, file, callback) {
+          var fi = file.fieldname + "_" + Date.now() + "_" + file.originalname;
+          filenamestore = "../logichron/resources/images-new"+fi;
+          callback(null, fi);
+      }
+  });
+
+  var upload = multer({ storage: Storage }).array("imgUploader"); 
+  
+  upload(req, res, function (err) { 
+    if (err) { 
+        return res.end("Something went wrong!"+err); 
+    } 
+     
+  });
   pool.connect(function(err, client, done){
     if(err) {
       done();
@@ -88,9 +87,10 @@ router.post('/add', oauth.authorise(), (req, res, next) => {
       return res.status(500).json({success: false, data: err});
     }
 
-    var singleInsert = 'INSERT INTO employee_master(emp_name, emp_mobile, emp_address, emp_status) values($1,$2,$3,0) RETURNING *',
-        params = [req.body.emp_name,req.body.emp_mobile,req.body.emp_address]
+    var singleInsert = "INSERT INTO employee_master(emp_name, emp_mobile, emp_address, emp_correspondence_address, emp_aadhar_no, emp_pancard_no, emp_designation, emp_emp_no, emp_email_id, emp_qualification, emp_image, emp_status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0) RETURNING *",
+        params = [req.body.emp_name,req.body.emp_mobile,req.body.emp_address,req.body.emp_correspondence_address,req.body.emp_aadhar_no,req.body.emp_pancard_no,req.body.emp_designation,req.body.emp_emp_no,req.body.emp_email_id,req.body.emp_qualification,filenamestore]
     client.query(singleInsert, params, function (error, result) {
+
         results.push(result.rows[0]); // Will contain your inserted rows
         done();
         return res.json(results);
@@ -99,9 +99,51 @@ router.post('/add', oauth.authorise(), (req, res, next) => {
     done(err);
   });
 });
-router.post('/edit/:empId', oauth.authorise(), (req, res, next) => {
+
+
+
+router.post('/edit/:employeeId', oauth.authorise(), (req, res, next) => {
   const results = [];
-  const id = req.params.empId;
+  const id = req.params.employeeId;
+  var Storage = multer.diskStorage({
+      destination: function (req, file, callback) {
+          // callback(null, "./images");
+            callback(null, "../logichron/resources/images-new");
+      },
+      filename: function (req, file, callback) {
+          var fi = file.fieldname + "_" + Date.now() + "_" + file.originalname;
+          filenamestore = "../logichron/resources/images-new/"+fi;
+          callback(null, fi);
+      }
+  });
+
+  var upload = multer({ storage: Storage }).array("emp_image"); 
+
+  upload(req, res, function (err) { 
+    if (err) { 
+        return res.end("Something went wrong!"+err); 
+    } 
+    pool.connect(function(err, client, done){
+      if(err) {
+        done();
+        console.log("the error is"+err);
+        return res.status(500).json({success: false, data: err});
+      }
+      var singleInsert = 'update employee_master set emp_name=$1, emp_mobile=$2, emp_address=$3, emp_correspondence_address=$4, emp_aadhar_no=$5, emp_pancard_no=$6, emp_designation=$7, emp_emp_no=$8, emp_email_id=$9, emp_qualification=$10, emp_image=$11, emp_updated_at=now() where emp_id=$12 RETURNING *',
+        params = [req.body.emp_name,req.body.emp_mobile,req.body.emp_address,req.body.emp_correspondence_address,req.body.emp_aadhar_no,req.body.emp_pancard_no,req.body.emp_designation,req.body.emp_emp_no,req.body.emp_email_id,req.body.emp_qualification,filenamestore,id];
+    client.query(singleInsert, params, function (error, result) {
+        results.push(result.rows[0]); // Will contain your inserted rows
+          done();
+          return res.json(results);
+      });
+      done(err);
+    });
+  }); 
+});
+
+router.post('/delete/:employeeId', oauth.authorise(), (req, res, next) => {
+  const results = [];
+  const id = req.params.employeeId;
   pool.connect(function(err, client, done){
     if(err) {
       done();
@@ -109,10 +151,70 @@ router.post('/edit/:empId', oauth.authorise(), (req, res, next) => {
       console.log("the error is"+err);
       return res.status(500).json({success: false, data: err});
     }
-    // SQL Query > Insert Data
-    client.query('UPDATE employee_master SET emp_name=$1, emp_mobile=$2, emp_address=$3 where emp_id=$4',[req.body.emp_name,req.body.emp_mobile,req.body.emp_address,id]);
+    client.query('BEGIN;');
+
+    var singleInsert = "update employee_master set emp_status=1, emp_updated_at=now() where emp_id=$1 RETURNING *",
+        params = [id]
+    client.query(singleInsert, params, function (error, result) {
+        results.push(result.rows[0]); // Will contain your inserted rows
+        done();
+        client.query('COMMIT;');
+        return res.json(results);
+    });
+
+    done(err);
+  });
+});
+
+router.post('/employee/total', oauth.authorise(), (req, res, next) => {
+  const results = [];
+  pool.connect(function(err, client, done){
+    if(err) {
+      done();
+      // pg.end();
+      console.log("the error is"+err);
+      return res.status(500).json({success: false, data: err});
+    }
+    const str = "%"+req.body.search+"%";
+
+    console.log(str);
+    const strqry =  "SELECT count(emp_id) as total "+
+                    "from employee_master "+
+                    "where emp_status=0 "+
+                    "and LOWER(emp_name||''||emp_mobile) LIKE LOWER($1);";
+
+    const query = client.query(strqry,[str]);
+    query.on('row', (row) => {
+      results.push(row);
+    });
+    query.on('end', () => {
+      done();
+      // pg.end();
+      return res.json(results);
+    });
+    done(err);
+  });
+});
+
+router.post('/employee/limit', oauth.authorise(), (req, res, next) => {
+  const results = [];
+  pool.connect(function(err, client, done){
+    if(err) {
+      done();
+      // pg.end();
+      console.log("the error is"+err);
+      return res.status(500).json({success: false, data: err});
+    }
+    const str = "%"+req.body.search+"%";
     // SQL Query > Select Data
-    const query = client.query('SELECT * FROM employee_master');
+
+    const strqry =  "SELECT * "+
+                    "FROM employee_master emp "+
+                    "where emp.emp_status = 0 "+
+                    "and LOWER(emp_name||''||emp_mobile) LIKE LOWER($1) "+
+                    "order by emp.emp_id desc LIMIT $2 OFFSET $3";
+
+    const query = client.query(strqry,[ str, req.body.number, req.body.begin]);
     query.on('row', (row) => {
       results.push(row);
     });
@@ -125,9 +227,8 @@ router.post('/edit/:empId', oauth.authorise(), (req, res, next) => {
   });
 });
 
-router.post('/delete/:empId', oauth.authorise(), (req, res, next) => {
+router.post('/typeahead/search', oauth.authorise(), (req, res, next) => {
   const results = [];
-  const id = req.params.empId;
   pool.connect(function(err, client, done){
     if(err) {
       done();
@@ -135,12 +236,16 @@ router.post('/delete/:empId', oauth.authorise(), (req, res, next) => {
       console.log("the error is"+err);
       return res.status(500).json({success: false, data: err});
     }
-
-    client.query('UPDATE employee_master SET emp_status=1 WHERE emp_id=($1)', [id]);
-    // SQL Query > Insert Data
-    // client.query('UPDATE employee_master SET cm_code=$1, cm_name=$2, cm_mobile=$3, cm_email=$4, cm_address=$5, cm_city=$6, cm_state=$7, cm_pin_code=$8, cm_car_name=$9, cm_car_model=$10, cm_car_number=$11 where cm_id=$12',[req.body.cm_code,req.body.cm_name,req.body.cm_mobile,req.body.cm_email,req.body.cm_address,req.body.cm_city,req.body.cm_state,req.body.cm_pin_code,req.body.cm_car_name,req.body.cm_car_model,req.body.cm_car_number,id]);
+    const str = "%"+req.body.search+"%";
     // SQL Query > Select Data
-    const query = client.query('SELECT * FROM employee_master');
+
+    const strqry =  "SELECT * "+
+                    "FROM employee_master emp "+
+                    "where emp.emp_status = 0 "+
+                    "and LOWER(emp_name||' '||emp_mobile) LIKE LOWER($1) "+
+                    "order by emp.emp_id desc LIMIT 10";
+
+    const query = client.query(strqry,[str]);
     query.on('row', (row) => {
       results.push(row);
     });
@@ -152,52 +257,4 @@ router.post('/delete/:empId', oauth.authorise(), (req, res, next) => {
     done(err);
   });
 });
-
-router.get('/getCityStateList', oauth.authorise(), (req, res, next) => {
-  console.log("in");
-  const results = [];
-  pool.connect(function(err, client, done){
-    if(err) {
-      done();
-      // pg.end();
-      console.log("the error is"+err);
-      return res.status(500).json({success: false, data: err});
-    }
-    const query = client.query('SELECT STAM_ID,STAM_NAME FROM STATES');
-    query.on('row', (row) => {
-      results.push(row);
-    });
-    query.on('end', () => {
-      done();
-      // pg.end();
-      return res.json(results);
-    });
-    done(err);
-  });
-});
-
-router.get('/details/:empId', oauth.authorise(), (req, res, next) => {
-  const results = [];
-  const id = req.params.empId;
-  pool.connect(function(err, client, done){
-    if(err) {
-      done();
-      // pg.end();
-      console.log("the error is"+err);
-      return res.status(500).json({success: false, data: err});
-    }
-
-    const query = client.query("select sm.sm_invoice_no as sm_invoice, vm.cm_name, vm.cm_address, sm.sm_date, sm.sm_amount, sm.sm_balance_amount, sm.sm_status from sale_master sm LEFT OUTER JOIN customer_master vm on sm.sm_cm_id=vm.cm_id LEFT OUTER JOIN employee_master emp on sm.sm_emp_id=emp.emp_id where emp.emp_id = $1 order by sm_date desc",[id]);
-    query.on('row', (row) => {
-      results.push(row);
-    });
-    query.on('end', () => {
-      done();
-      // pg.end();
-      return res.json(results);
-    });
-    done(err);
-  });
-});
-
 module.exports = router;

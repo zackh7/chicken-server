@@ -4,6 +4,7 @@ var oauth = require('../oauth/index');
 var pg = require('pg');
 var path = require('path');
 var config = require('../config.js');
+var encryption = require('../commons/encryption.js');
 
 var multer = require('multer'); 
 
