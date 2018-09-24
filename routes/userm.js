@@ -41,7 +41,7 @@ router.get('/:usermId', oauth.authorise(), (req, res, next) => {
       return res.status(500).json({success: false, data: err});
     }
     // SQL Query > Select Data
-    const query = client.query('SELECT um_emp_id,um_rm_id,um_users_id,um_created_at,um_updated_at,um_status,username,password,is_online,last_login,last_logout,first_name,icon_image,created_at,updated_at,rm_name,rm_description,rm_created_at,rm_updated_at,rm_status,emp_name,emp_mobile,emp_address,emp_correspondence_address,emp_aadhar_no,emp_pancard_no,emp_designation,emp_emp_no,emp_email_id,emp_qualification,emp_image,emp_created_at,emp_updated_at,emp_status FROM user_master um inner join users u on um.um_users_id=u.id left outer join role_master rm on um.um_rm_id=rm.rm_id left outer join employee_master em on um.um_emp_id=em.emp_id where um_id=$1',[id]);
+    const query = client.query('SELECT * FROM user_master um inner join users u on um.um_users_id=u.id left outer join role_master rm on um.um_rm_id=rm.rm_id left outer join employee_master em on um.um_emp_id=em.emp_id where um_id=$1',[id]);
     query.on('row', (row) => {
       row.pass = encryption.decrypt(row.password);
       results.push(row);

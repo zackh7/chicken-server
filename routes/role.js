@@ -4,8 +4,34 @@ var oauth = require('../oauth/index');
 var pg = require('pg');
 var path = require('path');
 var config = require('../config.js');
+const roles = require("user-groups-roles");
 
 var pool = new pg.Pool(config);
+
+// roles.createNewRole('admin');
+// roles.createNewRole("user");
+// roles.createNewRole("manager");
+
+
+// /*privileges*/
+// roles.createNewPrivileges(['/add',"POST"], "This gets access to the article", false);
+// roles.createNewPrivileges(['/add',"GET"], "This inserts to the article", false);
+// roles.createNewPrivileges(['/add',"PUT"], "This edit the article", false);
+// roles.createNewPrivileges(['/add',"DELETE"], "This deletes the article", false);
+ 
+//  //admin
+
+// roles.addPrivilegeToRole("admin",['/add',"GET"], true);
+// roles.addPrivilegeToRole("admin",['/add',"POST"], true);
+// roles.addPrivilegeToRole("admin", ['/add',"PUT"], true);
+// roles.addPrivilegeToRole("admin", ['/add',"DELETE"], true);
+
+// //editor
+// roles.addPrivilegeToRole("manager",['/add',"POST"], true);
+// roles.addPrivilegeToRole("manager", ['/add',"PUT"], true);
+
+// //author
+// roles.addPrivilegeToRole("user",['/add',"POST"], false);
 
 /*router.get('/', oauth.authorise(), (req, res, next) => {
   const results = [];
@@ -37,7 +63,7 @@ router.get('/', oauth.authorise(), (req, res, next) => {
       console.log("the error is"+err);
       return res.status(500).json({success: false, data: err});
     }
-    const query = client.query("SELECT pm_id,pm_name,pm_add,pm_edit,pm_delete,pm_list,pm_status,pm_created_at,pm_updated_at FROM permission_master where pm_status=0 order by pm_id asc");
+    const query = client.query("SELECT pm_id,pm_name,pm_add,pm_edit,pm_delete,pm_list FROM permission_master order by pm_id asc");
     query.on('row', (row) => {
       results.push(row);
     });
@@ -84,7 +110,7 @@ router.get('/permission/:roleId', oauth.authorise(), (req, res, next) => {
       console.log("the error is"+err);
       return res.status(500).json({success: false, data: err});
     }
-    const query = client.query("SELECT rpm_rm_id,rpm_pm_id,rpm_add,rpm_edit,rpm_delete,rpm_list,pm_name,pm_add,pm_edit,pm_delete,pm_list,pm_status,pm_created_at,pm_updated_at,rm_name,rm_description,rm_status,rm_updated_at,rm_created_at FROM role_permission_master rpm inner join permission_master pm on rpm.rpm_pm_id=pm.pm_id left outer join role_master rm on rpm.rpm_rm_id=rm.rm_id where rm_id=$1",[id]);
+    const query = client.query("SELECT * FROM  role_permission_master rpm left outer join permission_master pm on rpm.rpm_pm_id=pm.pm_id where rpm_rm_id=$1",[id]);
     query.on('row', (row) => {
       results.push(row);
 
@@ -145,7 +171,42 @@ router.post('/edit/:roleId', oauth.authorise(), (req, res, next) => {
     client.query(singleInsert, params, function (error, result) {
         results.push(result.rows[0]); // Will contain your inserted rows
         permission.forEach(function(value, key){
-          client.query("update role_permission_master set rpm_add=$1, rpm_edit=$2, rpm_delete=$3, rpm_list=$4 where rpm_rm_id=$5 RETURNING *",[value.pm_add1,value.pm_edit1,value.pm_delete1,value.pm_list1,result.rows[0].rm_id])
+          
+          if (value.rpm_add === true){
+                value.rpm_add=1;
+            }
+            else{
+                if(value.rpm_add == false){
+
+                    value.rpm_add=0;
+                }
+            }
+            if (value.rpm_edit === true){
+                value.rpm_edit=1;
+            }
+            else{
+                if(value.rpm_edit == false){
+                value.rpm_edit=0; 
+                }
+            }
+
+            if (value.rpm_delete === true){
+                value.rpm_delete=1;
+            }
+            else{
+                if(value.rpm_delete == false){
+                value.rpm_delete=0; 
+                }
+            }
+            if (value.rpm_list === true){
+                value.rpm_list=1;
+            }
+            else{
+                if(value.rpm_list == false){
+                value.rpm_list=0; 
+                }
+            }
+           client.query("update role_permission_master set rpm_add=$1, rpm_edit=$2, rpm_delete=$3, rpm_list=$4 where rpm_rm_id=$5 and rpm_pm_id=$6",[value.rpm_add,value.rpm_edit,value.rpm_delete,value.rpm_list,id,value.rpm_pm_id])
         });
         client.query('COMMIT;');
         done();
@@ -301,6 +362,28 @@ router.post('/permission/edit:permId', oauth.authorise(), (req, res, next) => {
   });
 });
 
+router.get('/view/:rmId', oauth.authorise(), (req, res, next) => {
+  const results = [];
+  const id=req.params.rmId;
+  pool.connect(function(err, client, done){
+    if(err) {
+      done();
+      // pg.end();
+      console.log("the error is"+err);
+      return res.status(500).json({success: false, data: err});
+    }
+    const query = client.query("SELECT * FROM role_permission_master rpm inner join permission_master pm on rpm.rpm_pm_id=pm.pm_id left outer join role_master rm on rpm.rpm_rm_id=rm.rm_id where rm_id=$1",[id]);
+    query.on('row', (row) => {
+      results.push(row);
 
+    });
+    query.on('end', () => {
+      done();
+      // pg.end();
+      return res.json(results);
+    });
+  done(err);
+  });
+});
 
 module.exports = router;

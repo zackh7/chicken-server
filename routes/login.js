@@ -166,26 +166,25 @@ router.post('/changepassword', oauth.authorise(), (req, res, next) => {
 
 router.post('/isonline', oauth.authorise(), (req, res, next) => {
   const results = [];
-  const id = req.params.ctmId;
   pool.connect(function(err, client, done){
     if(err) {
       done();
-      // pg.end();
+      done(err);
       console.log("the error is"+err);
       return res.status(500).json({success: false, data: err});
     }
-
-    client.query('BEGIN;');
-
-    var singleInsert = 'UPDATE users SET is_online=1, last_login=now() where username=$1 RETURNING *',
-        params = [req.body.username]
-    client.query(singleInsert, params, function (error, result) {
-        results.push(result.rows[0]); // Will contain your inserted rows
-        done();
-        client.query('COMMIT;');
-        return res.json(results);
+    // // SQL Query > Select Data
+    client.query('update users set is_online=1, last_login=now() where username=$1',[req.body.username]);
+    const query = client.query('SELECT * FROM user_master um inner join users us on um.um_users_id=us.id inner join role_master rm on um.um_rm_id=rm.rm_id inner join role_permission_master rpm on rpm.rpm_rm_id=rm.rm_id inner join permission_master pm on rpm.rpm_pm_id=pm.pm_id where username=$1',[req.body.username]);
+    // Stream results back one row at a time
+    query.on('row', (row) => {
+      results.push(row);
     });
-
+    // After all data is returned, close connection and return results
+    query.on('end', () => {
+      done();
+      return res.json(results);
+    });
     done(err);
   });
 });
